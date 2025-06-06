@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Doc Simplifier</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            padding: 40px;
+        }
+
+        .input-methods {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .input-card {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 30px;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .input-card:hover {
+            border-color: #4facfe;
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(79, 172, 254, 0.2);
+        }
+
+        .input-card.active {
+            border-color: #4facfe;
+            background: #f0f8ff;
+        }
+
+        .input-card h3 {
+            color: #333;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .input-card i {
+            color: #4facfe;
+            font-size: 1.2rem;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #4facfe;
+        }
+
+        .file-upload {
+            border: 2px dashed #4facfe;
+            border-radius: 8px;
+            padding: 30px;
+            text-align: center;
+            background: #f8f9ff;
+            transition: all 0.3s ease;
+        }
+
+        .file-upload:hover {
+            background: #f0f8ff;
+        }
+
+        .file-upload.dragover {
+            border-color: #00f2fe;
+            background: #e6f7ff;
+        }
+
+        .file-upload i {
+            font-size: 3rem;
+            color: #4facfe;
+            margin-bottom: 15px;
+        }
+
+        textarea.form-control {
+            min-height: 150px;
+            resize: vertical;
+            font-family: 'Courier New', monospace;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(79, 172, 254, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .loading i {
+            font-size: 3rem;
+            color: #4facfe;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .results {
+            display: none;
+            margin-top: 40px;
+        }
+
+        .result-card {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+            border-left: 5px solid #4facfe;
+        }
+
+        .result-card h3 {
+            color: #333;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .api-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .info-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .info-item .value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #4facfe;
+        }
+
+        .info-item .label {
+            color: #666;
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+
+        .simplified-explanation {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        .simplified-explanation h3 {
+            color: #4facfe;
+            margin-top: 25px;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+            border-bottom: 2px solid #f0f8ff;
+            padding-bottom: 8px;
+        }
+
+        .simplified-explanation h3:first-child {
+            margin-top: 0;
+        }
+
+        .simplified-explanation ul {
+            margin: 15px 0;
+            padding-left: 20px;
+        }
+
+        .simplified-explanation li {
+            margin-bottom: 8px;
+            line-height: 1.5;
+        }
+
+        .simplified-explanation p {
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+
+        .simplified-explanation strong {
+            color: #333;
+            font-weight: 600;
+        }
+
+        .simplified-explanation code {
+            background: #f8f9fa;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            color: #e83e8c;
+            font-size: 0.9em;
+        }
+
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 5px solid #c33;
+            margin-top: 20px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .format-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .format-btn {
+            padding: 8px 16px;
+            border: 2px solid #e9ecef;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .format-btn.active {
+            border-color: #4facfe;
+            background: #4facfe;
+            color: white;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .main-content {
+                padding: 20px;
+            }
+            
+            .input-methods {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-magic"></i> API Doc Simplifier</h1>
+            <p>Transform complex API documentation into simple, understandable explanations</p>
+        </div>
+
+        <div class="main-content">
+            <div class="input-methods">
+                <!-- File Upload Method -->
+                <div class="input-card" id="file-card">
+                    <h3><i class="fas fa-upload"></i> Upload File</h3>
+                    <p style="margin-bottom: 20px; color: #666;">Upload your OpenAPI/Swagger JSON or YAML file</p>
+                    
+                    <div class="file-upload" id="file-upload">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <p><strong>Click to upload</strong> or drag and drop</p>
+                        <p style="font-size: 0.9rem; color: #666; margin-top: 10px;">
+                            Supports JSON, YAML, and YML files
+                        </p>
+                        <input type="file" id="file-input" accept=".json,.yaml,.yml" style="display: none;">
+                    </div>
+                    
+                    <button class="btn" id="upload-btn" style="margin-top: 20px; width: 100%;" disabled>
+                        <i class="fas fa-magic"></i> Simplify Documentation
+                    </button>
+                </div>
+
+                <!-- URL Method -->
+                <div class="input-card" id="url-card">
+                    <h3><i class="fas fa-link"></i> From URL</h3>
+                    <p style="margin-bottom: 20px; color: #666;">Enter any API documentation URL - we'll automatically find the specification!</p>
+                    
+                    <div class="form-group">
+                        <label for="url-input">API Documentation URL</label>
+                        <input type="url" id="url-input" class="form-control" 
+                               placeholder="https://docs.apollo.io/ or https://api.example.com/swagger.json">
+                    </div>
+                    
+                    <p style="font-size: 0.9rem; color: #666; margin-bottom: 20px;">
+                        <i class="fas fa-lightbulb"></i> 
+                        Works with documentation sites (like docs.apollo.io) or direct API spec URLs
+                    </p>
+                    
+                    <button class="btn" id="url-btn" style="width: 100%;">
+                        <i class="fas fa-magic"></i> Simplify Documentation
+                    </button>
+                </div>
+
+                <!-- Raw Content Method -->
+                <div class="input-card" id="raw-card">
+                    <h3><i class="fas fa-code"></i> Paste Content</h3>
+                    <p style="margin-bottom: 20px; color: #666;">Paste your API documentation directly</p>
+                    
+                    <div class="format-selector">
+                        <button class="format-btn active" data-format="json">JSON</button>
+                        <button class="format-btn" data-format="yaml">YAML</button>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="raw-input">API Documentation Content</label>
+                        <textarea id="raw-input" class="form-control" 
+                                  placeholder="Paste your OpenAPI/Swagger documentation here..."></textarea>
+                    </div>
+                    
+                    <button class="btn" id="raw-btn" style="width: 100%;">
+                        <i class="fas fa-magic"></i> Simplify Documentation
+                    </button>
+                </div>
+            </div>
+
+            <!-- Loading State -->
+            <div class="loading" id="loading">
+                <i class="fas fa-spinner"></i>
+                <h3 style="margin-top: 20px;">Processing your API documentation...</h3>
+                <p style="color: #666; margin-top: 10px;">This may take a few moments</p>
+            </div>
+
+            <!-- Results -->
+            <div class="results" id="results">
+                <div class="result-card">
+                    <h3><i class="fas fa-info-circle"></i> API Overview</h3>
+                    <div class="api-info" id="api-info">
+                        <!-- API info will be populated here -->
+                    </div>
+                </div>
+
+                <div class="result-card">
+                    <h3><i class="fas fa-lightbulb"></i> Simplified Explanation</h3>
+                    <div class="simplified-explanation" id="simplified-explanation">
+                        <!-- Simplified explanation will be populated here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Error Display -->
+            <div class="error hidden" id="error">
+                <!-- Error messages will be displayed here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let selectedFormat = 'json';
+        let selectedFile = null;
+
+        // DOM elements
+        const fileInput = document.getElementById('file-input');
+        const fileUpload = document.getElementById('file-upload');
+        const uploadBtn = document.getElementById('upload-btn');
+        const urlInput = document.getElementById('url-input');
+        const urlBtn = document.getElementById('url-btn');
+        const rawInput = document.getElementById('raw-input');
+        const rawBtn = document.getElementById('raw-btn');
+        const loading = document.getElementById('loading');
+        const results = document.getElementById('results');
+        const errorDiv = document.getElementById('error');
+        const formatBtns = document.querySelectorAll('.format-btn');
+
+        // File upload handling
+        fileUpload.addEventListener('click', () => fileInput.click());
+        fileUpload.addEventListener('dragover', handleDragOver);
+        fileUpload.addEventListener('dragleave', handleDragLeave);
+        fileUpload.addEventListener('drop', handleDrop);
+        fileInput.addEventListener('change', handleFileSelect);
+
+        // Format selector
+        formatBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                formatBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                selectedFormat = btn.dataset.format;
+            });
+        });
+
+        // Button event listeners
+        uploadBtn.addEventListener('click', handleFileUpload);
+        urlBtn.addEventListener('click', handleUrlProcess);
+        rawBtn.addEventListener('click', handleRawProcess);
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            fileUpload.classList.add('dragover');
+        }
+
+        function handleDragLeave(e) {
+            e.preventDefault();
+            fileUpload.classList.remove('dragover');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            fileUpload.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFileSelect({ target: { files } });
+            }
+        }
+
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (file) {
+                selectedFile = file;
+                fileUpload.innerHTML = `
+                    <i class="fas fa-file-alt"></i>
+                    <p><strong>${file.name}</strong></p>
+                    <p style="font-size: 0.9rem; color: #666;">Ready to process</p>
+                `;
+                uploadBtn.disabled = false;
+            }
+        }
+
+        async function handleFileUpload() {
+            if (!selectedFile) return;
+
+            const formData = new FormData();
+            formData.append('apiDoc', selectedFile);
+
+            try {
+                showLoading();
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    displayResults(result);
+                } else {
+                    showError(result.error || 'Failed to process file');
+                }
+            } catch (error) {
+                showError('Network error: ' + error.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function handleUrlProcess() {
+            const url = urlInput.value.trim();
+            if (!url) {
+                showError('Please enter a valid URL');
+                return;
+            }
+
+            try {
+                showLoading();
+                const response = await fetch('/api/process-url', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ url })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    displayResults(result);
+                } else {
+                    showError(result.error || 'Failed to process URL');
+                }
+            } catch (error) {
+                showError('Network error: ' + error.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function handleRawProcess() {
+            const content = rawInput.value.trim();
+            if (!content) {
+                showError('Please paste your API documentation content');
+                return;
+            }
+
+            try {
+                showLoading();
+                const response = await fetch('/api/process-raw', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ content, format: selectedFormat })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    displayResults(result);
+                } else {
+                    showError(result.error || 'Failed to process content');
+                }
+            } catch (error) {
+                showError('Network error: ' + error.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function showLoading() {
+            loading.style.display = 'block';
+            results.style.display = 'none';
+            errorDiv.classList.add('hidden');
+        }
+
+        function hideLoading() {
+            loading.style.display = 'none';
+        }
+
+        function displayResults(result) {
+            const { apiInfo, simplifiedExplanation, foundSpecUrl } = result;
+
+            // Show success message if API spec was auto-discovered
+            let successMessage = '';
+            if (foundSpecUrl) {
+                successMessage = `
+                    <div style="background: #e8f5e8; border: 1px solid #4caf50; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                        <i class="fas fa-check-circle" style="color: #4caf50; margin-right: 8px;"></i>
+                        <strong>API Specification Found!</strong><br>
+                        <small>Automatically discovered at: <a href="${foundSpecUrl}" target="_blank">${foundSpecUrl}</a></small>
+                    </div>
+                `;
+            }
+
+            // Populate API info
+            const apiInfoDiv = document.getElementById('api-info');
+            apiInfoDiv.innerHTML = successMessage + `
+                <div class="info-item">
+                    <div class="value">${apiInfo.title}</div>
+                    <div class="label">API Name</div>
+                </div>
+                <div class="info-item">
+                    <div class="value">${apiInfo.version}</div>
+                    <div class="label">Version</div>
+                </div>
+                <div class="info-item">
+                    <div class="value">${apiInfo.totalEndpoints}</div>
+                    <div class="label">Endpoints</div>
+                </div>
+                <div class="info-item">
+                    <div class="value">${apiInfo.methods.join(', ')}</div>
+                    <div class="label">HTTP Methods</div>
+                </div>
+            `;
+
+            // Populate simplified explanation
+            const explanationDiv = document.getElementById('simplified-explanation');
+            explanationDiv.innerHTML = simplifiedExplanation;
+
+            results.style.display = 'block';
+            results.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function showError(message) {
+            errorDiv.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${message}`;
+            errorDiv.classList.remove('hidden');
+            errorDiv.scrollIntoView({ behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html> 
