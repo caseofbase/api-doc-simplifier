@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
@@ -10,7 +12,6 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const session = require('express-session');
 const { passport, requireAuth, requireThinAirLabs } = require('./auth');
-require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -32,6 +33,7 @@ app.use(session({
   saveUninitialized: false,
   cookie: {
     secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
 }));
@@ -39,16 +41,6 @@ app.use(session({
 // Initialize Passport
 app.use(passport.initialize());
 app.use(passport.session());
-
-// Serve static files with authentication
-app.use(express.static('public', { 
-  setHeaders: (res, path) => {
-    // Don't cache sensitive pages
-    if (path.endsWith('.html')) {
-      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    }
-  }
-}));
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -531,7 +523,7 @@ app.get('/auth/error', (req, res) => {
     <html>
       <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
         <h1>Authentication Error</h1>
-        <p>Access is restricted to @thinairlabs.com email addresses only.</p>
+        <p>Access is restricted to @thinairlabs.ca email addresses only.</p>
         <p>Please use your ThinAir Labs Google account to access this application.</p>
         <a href="/auth/google">Try Again</a>
       </body>
@@ -557,6 +549,11 @@ app.get('/auth/user', requireThinAirLabs, (req, res) => {
     }
   });
 });
+
+
+
+// Protected static file serving
+app.use('/public', requireThinAirLabs, express.static('public'));
 
 // Routes
 app.get('/', requireThinAirLabs, (req, res) => {

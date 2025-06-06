@@ -12,8 +12,8 @@ passport.use(new GoogleStrategy({
     const email = profile.emails[0].value;
     const domain = email.split('@')[1];
     
-    if (domain !== 'thinairlabs.com') {
-      return done(null, false, { message: 'Access restricted to thinairlabs.com email addresses' });
+    if (domain !== 'thinairlabs.ca') {
+      return done(null, false, { message: 'Access restricted to thinairlabs.ca email addresses' });
     }
     
     // Create user object
@@ -57,19 +57,19 @@ const requireAuth = (req, res, next) => {
 
 // Middleware to check if user has thinairlabs email
 const requireThinAirLabs = (req, res, next) => {
-  if (req.isAuthenticated() && req.user.email.endsWith('@thinairlabs.com')) {
+  if (req.isAuthenticated() && req.user.email.endsWith('@thinairlabs.ca')) {
     return next();
   }
   
   if (req.path.startsWith('/api/')) {
-    return res.status(403).json({ error: 'Access restricted to thinairlabs.com email addresses' });
+    return res.status(403).json({ error: 'Access restricted to thinairlabs.ca email addresses' });
   }
   
   res.status(403).send(`
     <html>
       <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
         <h1>Access Restricted</h1>
-        <p>This application is only available to users with @thinairlabs.com email addresses.</p>
+        <p>This application is only available to users with @thinairlabs.ca email addresses.</p>
         <p>Please contact your administrator if you believe this is an error.</p>
         <a href="/auth/logout">Try different account</a>
       </body>
