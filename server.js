@@ -8,6 +8,8 @@ const YAML = require('yamljs');
 const OpenAI = require('openai');
 const axios = require('axios');
 const cheerio = require('cheerio');
+const session = require('express-session');
+const { passport, requireAuth, requireThinAirLabs } = require('./auth');
 require('dotenv').config();
 
 const app = express();
@@ -22,7 +24,31 @@ const openai = new OpenAI({
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use(express.static('public'));
+
+// Session configuration
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'your-secret-key-change-this',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}));
+
+// Initialize Passport
+app.use(passport.initialize());
+app.use(passport.session());
+
+// Serve static files with authentication
+app.use(express.static('public', { 
+  setHeaders: (res, path) => {
+    // Don't cache sensitive pages
+    if (path.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    }
+  }
+}));
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -487,13 +513,58 @@ function extractApiInfo(apiDoc) {
   return info;
 }
 
+// Authentication Routes
+app.get('/auth/google', passport.authenticate('google', {
+  scope: ['profile', 'email']
+}));
+
+app.get('/auth/google/callback', 
+  passport.authenticate('google', { failureRedirect: '/auth/error' }),
+  (req, res) => {
+    // Successful authentication
+    res.redirect('/');
+  }
+);
+
+app.get('/auth/error', (req, res) => {
+  res.send(`
+    <html>
+      <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+        <h1>Authentication Error</h1>
+        <p>Access is restricted to @thinairlabs.com email addresses only.</p>
+        <p>Please use your ThinAir Labs Google account to access this application.</p>
+        <a href="/auth/google">Try Again</a>
+      </body>
+    </html>
+  `);
+});
+
+app.get('/auth/logout', (req, res) => {
+  req.logout((err) => {
+    if (err) {
+      console.error('Logout error:', err);
+    }
+    res.redirect('/');
+  });
+});
+
+app.get('/auth/user', requireThinAirLabs, (req, res) => {
+  res.json({
+    user: {
+      name: req.user.name,
+      email: req.user.email,
+      picture: req.user.picture
+    }
+  });
+});
+
 // Routes
-app.get('/', (req, res) => {
+app.get('/', requireThinAirLabs, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Upload and process API documentation file
-app.post('/api/upload', upload.single('apiDoc'), async (req, res) => {
+app.post('/api/upload', requireThinAirLabs, upload.single('apiDoc'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
@@ -536,7 +607,7 @@ app.post('/api/upload', upload.single('apiDoc'), async (req, res) => {
 });
 
 // Process API documentation from URL
-app.post('/api/process-url', async (req, res) => {
+app.post('/api/process-url', requireThinAirLabs, async (req, res) => {
   try {
     const { url } = req.body;
     
@@ -616,7 +687,7 @@ app.post('/api/process-url', async (req, res) => {
 });
 
 // Process raw API documentation JSON/YAML
-app.post('/api/process-raw', async (req, res) => {
+app.post('/api/process-raw', requireThinAirLabs, async (req, res) => {
   try {
     const { content, format } = req.body;
     
