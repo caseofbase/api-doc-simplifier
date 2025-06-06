@@ -29,12 +29,13 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Session configuration
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-secret-key-change-this',
-  resave: false,
-  saveUninitialized: false,
+  resave: true, // Force session save for serverless
+  saveUninitialized: true, // Save uninitialized sessions for serverless
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    sameSite: 'lax' // Important for OAuth redirects
   }
 }));
 
