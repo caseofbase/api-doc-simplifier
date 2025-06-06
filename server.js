@@ -11,7 +11,8 @@ const OpenAI = require('openai');
 const axios = require('axios');
 const cheerio = require('cheerio');
 const session = require('express-session');
-const { passport, requireAuth, requireThinAirLabs } = require('./auth');
+const cookieParser = require('cookie-parser');
+const { passport, generateJWT, requireThinAirLabsJWT } = require('./auth-jwt');
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -25,6 +26,7 @@ const openai = new OpenAI({
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(cookieParser());
 
 // Session configuration
 app.use(session({
@@ -514,7 +516,17 @@ app.get('/auth/google', passport.authenticate('google', {
 app.get('/auth/google/callback', 
   passport.authenticate('google', { failureRedirect: '/auth/error' }),
   (req, res) => {
-    // Successful authentication
+    // Successful authentication - generate JWT token
+    const token = generateJWT(req.user);
+    
+    // Set JWT token as HTTP-only cookie
+    res.cookie('auth_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    });
+    
     console.log('OAuth callback success - User:', req.user?.email);
     res.redirect('/');
   }
@@ -535,6 +547,9 @@ app.get('/auth/error', (req, res) => {
 });
 
 app.get('/auth/logout', (req, res) => {
+  // Clear JWT token cookie
+  res.clearCookie('auth_token');
+  
   req.logout((err) => {
     if (err) {
       console.error('Logout error:', err);
@@ -543,7 +558,7 @@ app.get('/auth/logout', (req, res) => {
   });
 });
 
-app.get('/auth/user', requireThinAirLabs, (req, res) => {
+app.get('/auth/user', requireThinAirLabsJWT, (req, res) => {
   res.json({
     user: {
       name: req.user.name,
@@ -555,10 +570,14 @@ app.get('/auth/user', requireThinAirLabs, (req, res) => {
 
 // Temporary debug route for production troubleshooting
 app.get('/auth/debug', (req, res) => {
+  const token = req.cookies.auth_token;
+  const { verifyJWT } = require('./auth-jwt');
+  const user = token ? verifyJWT(token) : null;
+  
   res.json({
-    isAuthenticated: req.isAuthenticated(),
-    user: req.user,
-    sessionID: req.sessionID,
+    isAuthenticated: !!user,
+    user: user,
+    hasToken: !!token,
     environment: process.env.NODE_ENV,
     hasSessionSecret: !!process.env.SESSION_SECRET
   });
@@ -567,15 +586,15 @@ app.get('/auth/debug', (req, res) => {
 
 
 // Protected static file serving
-app.use('/public', requireThinAirLabs, express.static('public'));
+app.use('/public', requireThinAirLabsJWT, express.static('public'));
 
 // Routes
-app.get('/', requireThinAirLabs, (req, res) => {
+app.get('/', requireThinAirLabsJWT, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Upload and process API documentation file
-app.post('/api/upload', requireThinAirLabs, upload.single('apiDoc'), async (req, res) => {
+app.post('/api/upload', requireThinAirLabsJWT, upload.single('apiDoc'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
@@ -618,7 +637,7 @@ app.post('/api/upload', requireThinAirLabs, upload.single('apiDoc'), async (req,
 });
 
 // Process API documentation from URL
-app.post('/api/process-url', requireThinAirLabs, async (req, res) => {
+app.post('/api/process-url', requireThinAirLabsJWT, async (req, res) => {
   try {
     const { url } = req.body;
     
@@ -698,7 +717,7 @@ app.post('/api/process-url', requireThinAirLabs, async (req, res) => {
 });
 
 // Process raw API documentation JSON/YAML
-app.post('/api/process-raw', requireThinAirLabs, async (req, res) => {
+app.post('/api/process-raw', requireThinAirLabsJWT, async (req, res) => {
   try {
     const { content, format } = req.body;
     
