@@ -550,6 +550,17 @@ app.get('/auth/user', requireThinAirLabs, (req, res) => {
   });
 });
 
+// Temporary debug route for production troubleshooting
+app.get('/auth/debug', (req, res) => {
+  res.json({
+    isAuthenticated: req.isAuthenticated(),
+    user: req.user,
+    sessionID: req.sessionID,
+    environment: process.env.NODE_ENV,
+    hasSessionSecret: !!process.env.SESSION_SECRET
+  });
+});
+
 
 
 // Protected static file serving
