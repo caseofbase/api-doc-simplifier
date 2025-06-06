@@ -13,7 +13,7 @@ const { passport, requireAuth, requireThinAirLabs } = require('./auth');
 require('dotenv').config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3002;
 
 // Initialize OpenAI
 const openai = new OpenAI({
