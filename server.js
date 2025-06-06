@@ -514,11 +514,13 @@ app.get('/auth/google/callback',
   passport.authenticate('google', { failureRedirect: '/auth/error' }),
   (req, res) => {
     // Successful authentication
+    console.log('OAuth callback success - User:', req.user?.email);
     res.redirect('/');
   }
 );
 
 app.get('/auth/error', (req, res) => {
+  console.log('OAuth error - User redirected to error page');
   res.send(`
     <html>
       <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
