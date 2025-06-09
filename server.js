@@ -645,68 +645,82 @@ app.post('/api/process-url', requireThinAirLabsJWT, async (req, res) => {
       return res.status(400).json({ error: 'URL is required' });
     }
 
-    console.log('Processing API documentation from URL:', url);
+    console.log('Processing documentation from URL:', url);
 
-    let apiSpecUrl = url;
-    
     // Check if this is a direct API spec URL or a documentation website
     const isDirect = url.includes('.json') || url.includes('.yaml') || url.includes('.yml') || 
                     url.includes('swagger.json') || url.includes('openapi.json');
     
-    let apiDoc;
-    
-    if (!isDirect) {
-      // This looks like a documentation website, try to find the API spec
-      console.log('Detected documentation website, searching for API specification...');
-      const result = await findApiSpecFromDocs(url);
-      
-      if (typeof result === 'string') {
-        // Found a URL to an API spec
-        apiSpecUrl = result;
-        console.log(`Found API specification at: ${apiSpecUrl}`);
-        apiDoc = await SwaggerParser.validate(apiSpecUrl);
-      } else {
-        // Generated an API spec from documentation
-        apiDoc = result;
-        console.log('Generated API specification from documentation structure');
+    if (isDirect) {
+      // Handle direct OpenAPI/Swagger spec files
+      console.log('Processing direct API specification file...');
+      try {
+        const apiDoc = await SwaggerParser.validate(url);
+        const apiInfo = extractApiInfo(apiDoc);
+        const simplifiedExplanation = await simplifyApiDoc(apiDoc);
+
+        return res.json({
+          success: true,
+          apiInfo,
+          simplifiedExplanation,
+          analysisType: 'openapi-spec',
+          message: 'API specification processed successfully'
+        });
+      } catch (specError) {
+        console.log('Failed to parse as OpenAPI spec, falling back to intelligent analysis');
       }
-    } else {
-      // Parse the API documentation from the direct URL
-      apiDoc = await SwaggerParser.validate(apiSpecUrl);
     }
-    
-    // Extract basic information
-    const apiInfo = extractApiInfo(apiDoc);
-    
-    // Generate simplified explanation
-    const simplifiedExplanation = await simplifyApiDoc(apiDoc);
+
+    // Use intelligent documentation analysis for complex sites
+    console.log('Using intelligent documentation analysis...');
+    const siteInfo = await analyzeDocumentationSite(url);
+    const intelligentSummary = await createIntelligentSummary(siteInfo);
+
+    // Also try to find traditional API specs as a bonus
+    let foundApiSpec = null;
+    try {
+      const specResult = await findApiSpecFromDocs(url);
+      if (typeof specResult === 'string') {
+        foundApiSpec = specResult;
+      }
+    } catch (error) {
+      // No traditional API spec found, that's okay
+      console.log('No traditional API spec found, using intelligent analysis only');
+    }
 
     res.json({
       success: true,
-      apiInfo,
-      simplifiedExplanation,
-      foundSpecUrl: apiSpecUrl !== url ? apiSpecUrl : undefined,
-      message: 'API documentation processed successfully'
+      siteInfo: {
+        title: siteInfo.title,
+        serviceType: siteInfo.serviceType,
+        knownService: siteInfo.knownService,
+        url: siteInfo.url,
+        keyTopics: siteInfo.keyTopics.slice(0, 10),
+        apiEndpoints: siteInfo.apiEndpoints.slice(0, 5),
+        rateLimits: siteInfo.rateLimits,
+        authenticationMethods: siteInfo.authenticationMethods.slice(0, 3)
+      },
+      intelligentSummary,
+      foundApiSpec,
+      analysisType: 'intelligent-analysis',
+      message: 'Documentation analyzed successfully using AI-powered analysis'
     });
 
   } catch (error) {
-    console.error('Error processing API documentation from URL:', error);
+    console.error('Error processing documentation from URL:', error);
     
-    let errorMessage = 'Failed to process API documentation from URL';
+    let errorMessage = 'Failed to process documentation from URL';
     let details = error.message;
     
-    if (error.message.includes('No API specification found')) {
-      errorMessage = 'No API specification found';
-      details = 'Could not find an OpenAPI/Swagger specification at the provided URL. The site may not have a public API specification, or it might be located elsewhere.';
-    } else if (error.message.includes('not a valid JSON Schema')) {
-      errorMessage = 'Invalid API specification';
-      details = 'Found a file but it does not contain a valid OpenAPI/Swagger specification.';
-    } else if (error.message.includes('Request too large')) {
-      errorMessage = 'API documentation too large';
-      details = 'The API documentation is too large to process. Please try a smaller API specification or contact support.';
-    } else if (error.message.includes('Failed to find API specification')) {
-      errorMessage = 'Could not access documentation';
-      details = 'Unable to access the documentation website. Please check the URL and try again.';
+    if (error.message.includes('timeout')) {
+      errorMessage = 'Request timeout';
+      details = 'The documentation site took too long to respond. Please try again or check if the URL is accessible.';
+    } else if (error.message.includes('ENOTFOUND') || error.message.includes('ECONNREFUSED')) {
+      errorMessage = 'Cannot access URL';
+      details = 'Unable to access the provided URL. Please check that the URL is correct and accessible.';
+    } else if (error.message.includes('Failed to create intelligent summary')) {
+      errorMessage = 'AI analysis failed';
+      details = 'The AI analysis encountered an error. This might be due to API limits or complex content structure.';
     }
     
     res.status(500).json({ 
@@ -795,3 +809,289 @@ app.listen(PORT, () => {
 });
 
 module.exports = app; 
+
+// Helper function to intelligently analyze documentation websites
+async function analyzeDocumentationSite(url) {
+  try {
+    console.log(`Intelligently analyzing documentation site: ${url}`);
+    
+    const response = await axios.get(url, { 
+      timeout: 15000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; API-Doc-Simplifier/1.0)'
+      }
+    });
+    
+    const $ = cheerio.load(response.data);
+    const baseUrl = new URL(url).origin;
+    
+    // Extract comprehensive site information
+    const siteInfo = {
+      title: $('title').text() || $('h1').first().text() || 'Documentation',
+      description: $('meta[name="description"]').attr('content') || 
+                  $('meta[property="og:description"]').attr('content') || 
+                  $('p').first().text() || '',
+      url: url,
+      baseUrl: baseUrl,
+      favicon: $('link[rel="icon"]').attr('href') || $('link[rel="shortcut icon"]').attr('href'),
+      
+      // Content analysis
+      mainContent: '',
+      navigationStructure: [],
+      keyTopics: [],
+      codeExamples: [],
+      
+      // Technical details
+      apiEndpoints: [],
+      authenticationMethods: [],
+      rateLimits: [],
+      sdks: [],
+      
+      // Service identification
+      serviceType: 'unknown',
+      knownService: null
+    };
+
+    // Identify known services/platforms
+    const serviceIdentifiers = {
+      'apollo': {
+        keywords: ['apollo', 'graphql', 'federation', 'supergraph', 'router'],
+        type: 'GraphQL Platform',
+        description: 'Apollo GraphQL is a comprehensive platform for building, managing, and scaling GraphQL APIs'
+      },
+      'stripe': {
+        keywords: ['stripe', 'payment', 'billing', 'checkout'],
+        type: 'Payment Platform',
+        description: 'Stripe is a payment processing platform for online businesses'
+      },
+      'twilio': {
+        keywords: ['twilio', 'sms', 'voice', 'messaging', 'sendgrid'],
+        type: 'Communication Platform',
+        description: 'Twilio provides cloud communications platform as a service'
+      },
+      'github': {
+        keywords: ['github', 'git', 'repository', 'octocat', 'pull request'],
+        type: 'Development Platform',
+        description: 'GitHub is a platform for version control and collaboration'
+      },
+      'aws': {
+        keywords: ['aws', 'amazon web services', 'ec2', 's3', 'lambda'],
+        type: 'Cloud Platform',
+        description: 'Amazon Web Services provides cloud computing services'
+      },
+      'openai': {
+        keywords: ['openai', 'gpt', 'chatgpt', 'dall-e', 'whisper'],
+        type: 'AI Platform',
+        description: 'OpenAI provides artificial intelligence APIs and models'
+      },
+      'slack': {
+        keywords: ['slack', 'workspace', 'channel', 'bot api'],
+        type: 'Collaboration Platform',
+        description: 'Slack is a business communication platform'
+      },
+      'shopify': {
+        keywords: ['shopify', 'storefront', 'admin api', 'graphql admin'],
+        type: 'E-commerce Platform',
+        description: 'Shopify is an e-commerce platform for online stores'
+      },
+      'discord': {
+        keywords: ['discord', 'bot', 'guild', 'webhook'],
+        type: 'Communication Platform',
+        description: 'Discord is a voice, video and text communication service'
+      },
+      'notion': {
+        keywords: ['notion', 'database', 'page', 'block'],
+        type: 'Productivity Platform',
+        description: 'Notion is an all-in-one workspace for notes, tasks, wikis, and databases'
+      }
+    };
+
+    // Identify the service
+    const pageText = response.data.toLowerCase();
+    for (const [service, config] of Object.entries(serviceIdentifiers)) {
+      if (config.keywords.some(keyword => pageText.includes(keyword))) {
+        siteInfo.knownService = service;
+        siteInfo.serviceType = config.type;
+        siteInfo.description = config.description;
+        break;
+      }
+    }
+
+    // Extract main content (remove navigation, headers, footers)
+    const contentSelectors = [
+      'main', 
+      '.content', 
+      '.documentation', 
+      '.docs-content',
+      'article',
+      '.main-content',
+      '#content'
+    ];
+    
+    let mainContentElement = null;
+    for (const selector of contentSelectors) {
+      const element = $(selector);
+      if (element.length > 0) {
+        mainContentElement = element.first();
+        break;
+      }
+    }
+    
+    if (!mainContentElement) {
+      mainContentElement = $('body');
+    }
+
+    // Extract text content, preserving structure
+    siteInfo.mainContent = mainContentElement.text().replace(/\s+/g, ' ').trim().substring(0, 8000);
+
+    // Extract navigation structure
+    $('nav a, .nav a, .navigation a, .sidebar a, .menu a').each((i, elem) => {
+      const text = $(elem).text().trim();
+      const href = $(elem).attr('href');
+      if (text && href && text.length < 100) {
+        siteInfo.navigationStructure.push({
+          text: text,
+          href: href.startsWith('http') ? href : new URL(href, url).href
+        });
+      }
+    });
+
+    // Extract headings for topic analysis
+    $('h1, h2, h3, h4').each((i, elem) => {
+      const text = $(elem).text().trim();
+      if (text && text.length < 200) {
+        siteInfo.keyTopics.push(text);
+      }
+    });
+
+    // Look for code examples
+    $('pre code, .highlight, .code-block, code').each((i, elem) => {
+      const code = $(elem).text().trim();
+      if (code && code.length > 20 && code.length < 1000) {
+        siteInfo.codeExamples.push(code);
+      }
+    });
+
+    // Look for API endpoints in text
+    const endpointPatterns = [
+      /https?:\/\/[^\s]+\/api\/[^\s]*/gi,
+      /\/api\/[a-zA-Z0-9\/\-_]*/gi,
+      /POST|GET|PUT|DELETE|PATCH\s+\/[a-zA-Z0-9\/\-_]*/gi
+    ];
+
+    endpointPatterns.forEach(pattern => {
+      const matches = siteInfo.mainContent.match(pattern) || [];
+      siteInfo.apiEndpoints.push(...matches.slice(0, 10)); // Limit to prevent spam
+    });
+
+    // Look for authentication information
+    const authKeywords = ['authentication', 'auth', 'api key', 'bearer token', 'oauth', 'jwt'];
+    authKeywords.forEach(keyword => {
+      const regex = new RegExp(`${keyword}[^.]*\\.`, 'gi');
+      const matches = siteInfo.mainContent.match(regex) || [];
+      siteInfo.authenticationMethods.push(...matches.slice(0, 3));
+    });
+
+    // Look for rate limiting information
+    const rateLimitPatterns = [
+      /rate limit[^.]*\./gi,
+      /\d+\s*requests?\s*per\s*(second|minute|hour|day)/gi,
+      /throttl[^.]*\./gi,
+      /quota[^.]*\./gi
+    ];
+
+    rateLimitPatterns.forEach(pattern => {
+      const matches = siteInfo.mainContent.match(pattern) || [];
+      siteInfo.rateLimits.push(...matches.slice(0, 5));
+    });
+
+    // Look for SDK information
+    const sdkKeywords = ['sdk', 'client library', 'npm install', 'pip install', 'gem install'];
+    sdkKeywords.forEach(keyword => {
+      const regex = new RegExp(`${keyword}[^.]*\\.`, 'gi');
+      const matches = siteInfo.mainContent.match(regex) || [];
+      siteInfo.sdks.push(...matches.slice(0, 3));
+    });
+
+    return siteInfo;
+    
+  } catch (error) {
+    throw new Error(`Failed to analyze documentation site: ${error.message}`);
+  }
+}
+
+// Enhanced AI-powered documentation simplifier
+async function createIntelligentSummary(siteInfo) {
+  try {
+    const prompt = `
+You are an expert technical writer who specializes in making complex API and service documentation accessible to business users and developers alike.
+
+Analyze the following documentation site information and create a comprehensive, intelligent summary.
+
+SITE INFORMATION:
+Title: ${siteInfo.title}
+Service Type: ${siteInfo.serviceType}
+Known Service: ${siteInfo.knownService || 'Unknown'}
+URL: ${siteInfo.url}
+
+Description: ${siteInfo.description}
+
+Key Topics: ${siteInfo.keyTopics.slice(0, 20).join(', ')}
+
+Navigation Structure: ${siteInfo.navigationStructure.slice(0, 15).map(nav => nav.text).join(', ')}
+
+API Endpoints Found: ${siteInfo.apiEndpoints.slice(0, 10).join(', ')}
+
+Authentication Methods: ${siteInfo.authenticationMethods.join(' ')}
+
+Rate Limits: ${siteInfo.rateLimits.join(' ')}
+
+SDK Information: ${siteInfo.sdks.join(' ')}
+
+Main Content Sample: ${siteInfo.mainContent.substring(0, 3000)}
+
+INSTRUCTIONS:
+Create a comprehensive summary using HTML formatting with these sections:
+
+1. **Service Overview** - What this service/API does in simple terms
+2. **Key Capabilities** - Main features and what you can build with it
+3. **Getting Started** - How developers typically begin using this service
+4. **Authentication & Security** - How to authenticate and any security considerations
+5. **Rate Limits & Quotas** - Any usage limits or restrictions
+6. **Popular Use Cases** - Common ways this service is used
+7. **Developer Resources** - SDKs, libraries, and tools available
+8. **Important Considerations** - Things developers should know
+
+Use HTML tags for formatting:
+- <h3> for section headings
+- <strong> for emphasis
+- <ul> and <li> for lists
+- <p> for paragraphs
+- <code> for technical terms
+- <blockquote> for important notes
+
+Make it comprehensive but accessible - explain technical concepts in business terms when possible.
+If this is a known service like Apollo GraphQL, include specific insights about that platform.
+`;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4", // Using GPT-4 for better analysis
+      messages: [
+        {
+          role: "system",
+          content: "You are an expert technical documentation analyst who creates comprehensive, business-friendly summaries of complex API and service documentation."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      max_tokens: 2000,
+      temperature: 0.3
+    });
+
+    return response.choices[0].message.content;
+  } catch (error) {
+    throw new Error(`Failed to create intelligent summary: ${error.message}`);
+  }
+}

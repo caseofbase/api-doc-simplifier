@@ -621,8 +621,8 @@
             <!-- Loading State -->
             <div class="loading" id="loading">
                 <i class="fas fa-spinner"></i>
-                <h3>Processing your API documentation...</h3>
-                <p>This may take a few moments</p>
+                <h3>Analyzing documentation with AI...</h3>
+                <p>Intelligently parsing content and extracting key information</p>
             </div>
 
             <!-- Results -->
@@ -820,44 +820,115 @@
         }
 
         function displayResults(result) {
-            const { apiInfo, simplifiedExplanation, foundSpecUrl } = result;
-
-            // Show success message if API spec was auto-discovered
-            let successMessage = '';
-            if (foundSpecUrl) {
-                successMessage = `
+            const apiInfoDiv = document.getElementById('api-info');
+            const explanationDiv = document.getElementById('simplified-explanation');
+            
+            // Handle different analysis types
+            if (result.analysisType === 'intelligent-analysis') {
+                // Display intelligent analysis results
+                const { siteInfo, intelligentSummary, foundApiSpec } = result;
+                
+                // Show success message
+                let successMessage = `
                     <div class="success-message">
-                        <i class="fas fa-check-circle"></i>
-                        <strong>API Specification Found!</strong><br>
-                        <small>Automatically discovered at: <a href="${foundSpecUrl}" target="_blank">${foundSpecUrl}</a></small>
+                        <i class="fas fa-brain"></i>
+                        <strong>AI-Powered Analysis Complete!</strong><br>
+                        <small>Analyzed ${siteInfo.title} using intelligent documentation parsing</small>
                     </div>
                 `;
+                
+                if (foundApiSpec) {
+                    successMessage += `
+                        <div class="success-message" style="margin-top: 10px;">
+                            <i class="fas fa-plus-circle"></i>
+                            <strong>Bonus: API Spec Found!</strong><br>
+                            <small>Also discovered traditional API spec at: <a href="${foundApiSpec}" target="_blank">${foundApiSpec}</a></small>
+                        </div>
+                    `;
+                }
+
+                // Populate site info
+                apiInfoDiv.innerHTML = successMessage + `
+                    <div class="info-item">
+                        <div class="value">${siteInfo.title}</div>
+                        <div class="label">Service Name</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="value">${siteInfo.serviceType}</div>
+                        <div class="label">Service Type</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="value">${siteInfo.knownService || 'Custom'}</div>
+                        <div class="label">Platform</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="value">${siteInfo.keyTopics.length}</div>
+                        <div class="label">Key Topics</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="value">${siteInfo.apiEndpoints.length}</div>
+                        <div class="label">API Endpoints Found</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="value">${siteInfo.rateLimits.length > 0 ? 'Yes' : 'Not Found'}</div>
+                        <div class="label">Rate Limits Info</div>
+                    </div>
+                `;
+
+                // Show additional details if available
+                if (siteInfo.keyTopics.length > 0) {
+                    apiInfoDiv.innerHTML += `
+                        <div class="info-item" style="grid-column: 1 / -1;">
+                            <div class="value" style="font-size: 1rem; text-align: left;">
+                                ${siteInfo.keyTopics.slice(0, 8).join(' • ')}
+                            </div>
+                            <div class="label">Key Topics Discovered</div>
+                        </div>
+                    `;
+                }
+
+                // Populate intelligent summary
+                explanationDiv.innerHTML = intelligentSummary;
+                
+            } else {
+                // Handle traditional OpenAPI/Swagger results
+                const { apiInfo, simplifiedExplanation, foundSpecUrl } = result;
+
+                // Show success message if API spec was auto-discovered
+                let successMessage = '';
+                if (foundSpecUrl) {
+                    successMessage = `
+                        <div class="success-message">
+                            <i class="fas fa-check-circle"></i>
+                            <strong>API Specification Found!</strong><br>
+                            <small>Automatically discovered at: <a href="${foundSpecUrl}" target="_blank">${foundSpecUrl}</a></small>
+                        </div>
+                    `;
+                }
+
+                // Populate API info
+                apiInfoDiv.innerHTML = successMessage + `
+                    <div class="info-item">
+                        <div class="value">${apiInfo.title}</div>
+                        <div class="label">API Name</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="value">${apiInfo.version}</div>
+                        <div class="label">Version</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="value">${apiInfo.totalEndpoints}</div>
+                        <div class="label">Endpoints</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="value">${apiInfo.methods.join(', ')}</div>
+                        <div class="label">HTTP Methods</div>
+                    </div>
+                `;
+
+                // Populate simplified explanation
+                explanationDiv.innerHTML = simplifiedExplanation;
             }
-
-            // Populate API info
-            const apiInfoDiv = document.getElementById('api-info');
-            apiInfoDiv.innerHTML = successMessage + `
-                <div class="info-item">
-                    <div class="value">${apiInfo.title}</div>
-                    <div class="label">API Name</div>
-                </div>
-                <div class="info-item">
-                    <div class="value">${apiInfo.version}</div>
-                    <div class="label">Version</div>
-                </div>
-                <div class="info-item">
-                    <div class="value">${apiInfo.totalEndpoints}</div>
-                    <div class="label">Endpoints</div>
-                </div>
-                <div class="info-item">
-                    <div class="value">${apiInfo.methods.join(', ')}</div>
-                    <div class="label">HTTP Methods</div>
-                </div>
-            `;
-
-            // Populate simplified explanation
-            const explanationDiv = document.getElementById('simplified-explanation');
-            explanationDiv.innerHTML = simplifiedExplanation;
 
             results.style.display = 'block';
             results.scrollIntoView({ behavior: 'smooth' });
